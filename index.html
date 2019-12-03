@@ -10,6 +10,15 @@
  
  <button class="button" id="ConnectButton_master">Connect master</button>
  <button class="button" onClick = "onButtonClick_slave()" id = "ConnectButton_slave">Connect slave</button>
+ <!-- <font color="grey"><p style="font-family:arial;font-color:blue;" font color="red">time at start Master is (mS):  <span id="TimerValueAtStart_master"></span><p> 
+  <p style="font-family:arial;">timer at stop Master is (mS): <span id="TimerAtStop_master"></span><p>
+  <p style="font-family:arial;">time at maxPitch Master is (mS):  <span id="timerValueAtMaxPitch_master"></span><p>
+  <p style="font-family:arial;">time at maxPitch Master Cnt is (mS):  <span id="timerValueAtMaxPitch_masterCnt"></span><p>
+  <p style="font-family:arial;">time at threshold Master is (mS):  <span id="timerValueAtThreshold_master"></span><p>
+  <p style="font-family:arial;">time at start Slave is (mS):  <span id="TimerValueAtStart_slave"></span><p>
+  <p style="font-family:arial;">timer at stop Slave is (mS): <span id="TimerAtStop_slave"></span><p>
+  <p style="font-family:arial;">time at maxPitch Slave is (mS):  <span id="timerValueAtMaxPitch_slave"></span><p>
+  <p style="font-family:arial;">time at threshold Slave is (mS):  <span id="timerValueAtThreshold_slave"></span><p> -->
   <font color="black"><p style="font-family:arial;">max pitch slave: <span id="MaxPitch_slave"></span><p>
   <p style="font-family:arial;">max pitch master: <span id="MaxPitch_master"></span><p>
   <p style="font-family:arial;">timediff master/slave (ms) : <span id="timediff"></span><p>
@@ -18,7 +27,7 @@
   <br> <br>
   <button class="button" onClick = "onButtonDFUClick()">Go to FW update</button>
   <button class="button" onClick = "onButtonCsvClick()">Download Csv file</button>
-
+  <button class="button" onClick = "onButtonSyncClick()">Sync Sensor</button>	
   
   <img class="resize centre" src="https://media.licdn.com/dms/image/C560BAQEaiqa3qYlsPQ/company-logo_200_200/0?e=2159024400&v=beta&t=ptepbzkvRI7JMeGMFG_OGVPvc0bnl_wH3ODMADikDao" alt="LSG LOGO">
  
@@ -34,6 +43,7 @@
      
 	 var THRESHOLD_CMD = 0xF;
      var DFU_CMD       = 0xE;
+	 var SYNC_CMD      = 0xD;
      var datapointx = 1;
 	 var datapointy = 2;
 	 var datapointz = 3;
@@ -248,6 +258,39 @@ function onButtonSetThresholdClick() {
   });
 }
  
+ function onButtonSyncClick() {
+  log('Requesting Bluetooth Device...');
+  navigator.bluetooth.requestDevice(
+    {filters: [{services: ['battery_service']}]})
+  .then(device => {
+    log('Connecting to GATT Server...');
+    return device.gatt.connect();
+  })
+  .then(server => {
+    log('Getting Battery Service...');
+    return server.getPrimaryService('battery_service');
+  })
+  .then(service => {
+    log('Getting Battery Level Characteristic...');
+    return service.getCharacteristic('battery_level');
+  })
+  .then(characteristic => {
+    log('Reading Battery Level...');
+	let value = new Uint32Array(2);
+	value[0] = SYNC_CMD;
+    value[1] = 1;
+			
+    return characteristic.writeValue(value);
+  })
+  .then(value => {
+    //let batteryLevel = value.getUint8(0);
+    //log('> Battery Level is ' + batteryLevel + '%');
+  })
+  .catch(error => {
+    log('Argh! ' + error);
+  });
+}
+ 
 function onButtonClick_slave() {
   log('Requesting Bluetooth Device...');
   navigator.bluetooth.requestDevice(
@@ -276,6 +319,12 @@ function onButtonClick_slave() {
 	var el = document.getElementById('ConnectButton_slave');
     el.firstChild.data = "Connected_slave";
   })
+ // .then(value => {
+ //   let batteryLevel = value.getUint8(0);
+//	let txt = bin2String(value)
+//	log ('oke: ' + txt + ' end ')
+//    log('> value is ' + value + '%');
+//  })
   .catch(error => {
     log('Argh! ' + error);
   });
@@ -315,6 +364,12 @@ function onDisconnected_slave(event) {
 	var el = document.getElementById('ConnectButton_master');
     el.firstChild.data = "Connected_master";
   })
+ // .then(value => {
+ //   let batteryLevel = value.getUint8(0);
+//	let txt = bin2String(value)
+//	log ('oke: ' + txt + ' end ')
+//    log('> value is ' + value + '%');
+//  })
   .catch(error => {
     log('Argh! ' + error);
   });
@@ -360,16 +415,64 @@ function parseBLEvalues(value, results)
 {
     let nr_of_blks = 0;
 	 let retval = false;
-	 if (value.byteLength == 8) // buffer header has 8 bytes (at the moment)
+	 if (value.byteLength == 8) // buffer header has 20 bytes (at the moment)
 	 {
 		index = 0;
+	//	results.remainingSamplesAtTimer = value.getUint16(index, true);
+	//	index += 2;
+		
+	//    results.blockCntAtTimer = value.getUint8(index);
+	//	index++;
+        
+	//	results.timerAtRemainingSamples = value.getUint32(index, /*littleEndian=*/true);
+	//    index += 4;
+		
+	//	results.blockCntAtThreshold = value.getUint8(index);
+	//	index++;
+		
+    //    results.sampleOffsetInBlockAtThreshold = value.getUint8(index);	
+    //   index++;		
+		
+	//	results.timerValueAtStart =  results.timerAtRemainingSamples - (((SPI_NR_OF_BUFS * ELEMENTS_IN_FIFO) + results.remainingSamplesAtTimer) * TIMER_TICKS_PER_SAMPLE);
 		
 		results.maxPitchVal = value.getUint32(index, /*littleEndian=*/true);  //value.getUint64(index, /*littleEndian=*/true);
 		index += 4;
 		results.maxPitchVal = (results.maxPitchVal/ RAWVALUES_PER_DEGREE);
+		
+	//    results.blockCntAtMaxPitch =  value.getUint8(index);
+	//	index++;
+		
+	//    results.sampleOffsetInBlockAtMaxPitch = value.getUint8(index);
+	//	index++;
+		
 		results.timerAtMaxPitchCnt = value.getUint32(index, /*littleEndian=*/true);
 		index += 4;
 		
+		var correction_for_remainging_samples = 0;
+		
+	//	if (results.blockCntAtMaxPitch > results.blockCntAtTimer)
+	//	{
+	//	   nr_of_blks = results.blockCntAtMaxPitch - results.blockCntAtTimer;
+	//	}
+	//	else
+	//	{
+	//	   nr_of_blks = SPI_NR_OF_BUFS -  results.blockCntAtTimer + results.blockCntAtMaxPitch;
+	//	   correction_for_remainging_samples = results.remainingSamplesAtTimer;
+	//	}
+	//	results.timerValueAtMaxPitch =  results.timerValueAtStart + (((ELEMENTS_IN_FIFO * nr_of_blks) + results.sampleOffsetInBlockAtMaxPitch + correction_for_remainging_samples) * TIMER_TICKS_PER_SAMPLE);
+		
+	//	var correction_for_remainging_samples = 0;
+		
+	//	if (results.blockCntAtThreshold > results.blockCntAtTimer)
+	//	{
+	//	   nr_of_blks = results.blockCntAtThreshold - results.blockCntAtTimer;
+	//	}
+	//	else
+	//	{
+	//	   nr_of_blks = SPI_NR_OF_BUFS -  results.blockCntAtTimer + results.blockCntAtThreshold;
+	//	   correction_for_remainging_samples = results.remainingSamplesAtTimer;
+	//	}
+	//	results.timerValueAtThreshold =  results.timerValueAtStart + (((ELEMENTS_IN_FIFO * nr_of_blks) + results.sampleOffsetInBlockAtThreshold + correction_for_remainging_samples) * TIMER_TICKS_PER_SAMPLE);
 		retval = true;
 	  }
 	  return retval;
@@ -382,7 +485,12 @@ function handleSlaveChanged(event) {
 	
 	 if (parseBLEvalues(value, sensorValSlave) == true)
 	 {
+	
+	//	document.getElementById("TimerValueAtStart_slave").innerHTML = (sensorValSlave.timerValueAtStart/(32.768)).toFixed(0); // in mS
+	//	document.getElementById("TimerAtStop_slave").innerHTML = (sensorValSlave.timerAtRemainingSamples/(32.768)).toFixed(0);
+	//	document.getElementById("timerValueAtMaxPitch_slave").innerHTML = (sensorValSlave.timerValueAtMaxPitch/(32.768)).toFixed(0); // in mS
 		document.getElementById("MaxPitch_slave").innerHTML = (sensorValSlave.maxPitchVal).toFixed(0); // in mS
+	//	document.getElementById("timerValueAtThreshold_slave").innerHTML = (sensorValSlave.timerValueAtThreshold/32.768).toFixed(0);
 	 }
 	
 }
@@ -393,7 +501,13 @@ function handleBatteryLevelChanged(event) {
    value = value.buffer ? value : new DataView(value);
    if (parseBLEvalues(value, sensorValMaster))
    {
+		
+	//	document.getElementById("TimerValueAtStart_master").innerHTML = (sensorValMaster.timerValueAtStart/(32.768)).toFixed(0); // in mS
+	//	document.getElementById("TimerAtStop_master").innerHTML = (sensorValMaster.timerAtRemainingSamples/(32.768)).toFixed(0);
+	//	document.getElementById("timerValueAtMaxPitch_master").innerHTML = (sensorValMaster.timerValueAtMaxPitch/(32.768)).toFixed(0); // in mS
+	//	document.getElementById("timerValueAtMaxPitch_masterCnt").innerHTML = (sensorValMaster.timerAtMaxPitchCnt/(32.768)).toFixed(0); 
 		document.getElementById("MaxPitch_master").innerHTML = (sensorValMaster.maxPitchVal).toFixed(0); // in mS
+	//	document.getElementById("timerValueAtThreshold_master").innerHTML = (sensorValMaster.timerValueAtThreshold/32.768).toFixed(0);
    }
    
 }
