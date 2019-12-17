@@ -27,8 +27,12 @@
   <br> <br>
   <button class="button" onClick = "onButtonDFUClick()">Go to FW update</button>
   <button class="button" onClick = "onButtonCsvClick()">Download Csv file</button>
-  <button class="button" onClick = "onButtonSyncClick()">Sync Sensor</button>	
+  <button class="button" onClick = "onButtonSyncClick()" id = "sync_sensor">Sync Sensor</button>	
+  <button class="button" onClick = "onButtonSendMasterAdress()" id = "send_address">Send Address</button>
+  <button class="button" onClick = "onButtonSendResetAdress()" id = "reset_address">Reset Address</button>
   
+
+
   <img class="resize centre" src="https://media.licdn.com/dms/image/C560BAQEaiqa3qYlsPQ/company-logo_200_200/0?e=2159024400&v=beta&t=ptepbzkvRI7JMeGMFG_OGVPvc0bnl_wH3ODMADikDao" alt="LSG LOGO">
  
   <script type="text/javascript"> 
@@ -44,10 +48,21 @@
 	 var THRESHOLD_CMD = 0xF;
      var DFU_CMD       = 0xE;
 	 var SYNC_CMD      = 0xD;
+	 var ADR_LSB_CMD   = 0xC;
+	 var ADR_MSB_CMD   = 0xB;
+	 var ADR_RST_CMD   = 0xA;
+	 var MASTER_CMD    = 0x9;
      var datapointx = 1;
 	 var datapointy = 2;
 	 var datapointz = 3;
 	 
+	 var bluetoothDevice_slave = null;
+	 var bluetoothDevice_slave_GATT_server = null;
+	 var bluetoothDevice_master = null;
+	 var bluetoothDevice_master_GATT_server = null;
+	 var inSync = false;
+	 var masterAddress = new Uint8Array(6);
+	 masterAddress[0] = 0; // make invalid
 	 
      class SensorValues {
         constructor()
@@ -158,7 +173,7 @@
 	<script>
 	
 	setInterval(function(){ 
-	                        diff = ((sensorValMaster.timerAtMaxPitchCnt - sensorValSlave.timerAtMaxPitchCnt)/(32.768)).toFixed(0);
+	                        diff = ((sensorValSlave.timerAtMaxPitchCnt - sensorValMaster.timerAtMaxPitchCnt)/(32.768)).toFixed(0);
 							document.getElementById("timediff").innerHTML = diff;
                             addCsvElement(sensorValMaster, sensorValSlave, diff);	}, 2000);
 	</script>
@@ -193,23 +208,23 @@ function onButtonCsvClick() {
  
  
 function onButtonSetThresholdClick() {
-  log('Requesting Bluetooth Device...');
+  console.log('Requesting Bluetooth Device...');
   navigator.bluetooth.requestDevice(
     {filters: [{services: ['battery_service']}]})
   .then(device => {
-    log('Connecting to GATT Server...');
+    console.log('Connecting to GATT Server...');
     return device.gatt.connect();
   })
   .then(server => {
-    log('Getting Battery Service...');
+    console.log('Getting Battery Service...');
     return server.getPrimaryService('battery_service');
   })
   .then(service => {
-    log('Getting Battery Level Characteristic...');
+    console.log('Getting Battery Level Characteristic...');
     return service.getCharacteristic('battery_level');
   })
   .then(characteristic => {
-    log('Reading Battery Level...');
+    console.log('Reading Battery Level...');
 	let value = new Uint32Array(2);
 	value[0] = THRESHOLD_CMD;
     value[1] = document.getElementById("threshold").value / 10;
@@ -219,30 +234,30 @@ function onButtonSetThresholdClick() {
   })
   .then(value => {
     //let batteryLevel = value.getUint8(0);
-    //log('> Battery Level is ' + batteryLevel + '%');
+    //console.log('> Battery Level is ' + batteryLevel + '%');
   })
   .catch(error => {
-    log('Argh! ' + error);
+    console.log('Argh! ' + error);
   });
 }
  function onButtonDFUClick() {
-  log('Requesting Bluetooth Device...');
+  console.log('Requesting Bluetooth Device...');
   navigator.bluetooth.requestDevice(
     {filters: [{services: ['battery_service']}]})
   .then(device => {
-    log('Connecting to GATT Server...');
+    console.log('Connecting to GATT Server...');
     return device.gatt.connect();
   })
   .then(server => {
-    log('Getting Battery Service...');
+    console.log('Getting Battery Service...');
     return server.getPrimaryService('battery_service');
   })
   .then(service => {
-    log('Getting Battery Level Characteristic...');
+    console.log('Getting Battery Level Characteristic...');
     return service.getCharacteristic('battery_level');
   })
   .then(characteristic => {
-    log('Reading Battery Level...');
+    console.log('Reading Battery Level...');
 	let value = new Uint32Array(2);
 	value[0] = DFU_CMD;
     value[1] = 1;
@@ -251,134 +266,298 @@ function onButtonSetThresholdClick() {
   })
   .then(value => {
     //let batteryLevel = value.getUint8(0);
-    //log('> Battery Level is ' + batteryLevel + '%');
+    //console.log('> Battery Level is ' + batteryLevel + '%');
   })
   .catch(error => {
-    log('Argh! ' + error);
+    console.log('Argh! ' + error);
   });
 }
+
+async function readvalueFromService(server)
+{
+  
+  try {
+  
+  var service = await server.getPrimaryService('battery_service');
+  var characteristic = await service.getCharacteristic('battery_level');
+  var value = await characteristic.readValue();
+  let batteryLevel = value.getUint8(0);
+    console.log('> Battery Level is ' + batteryLevel + '%');
+	batteryLevel = value.getUint8(1);
+	console.log('> status is ' + batteryLevel + '');
+	batteryLevel = value.getUint8(2);
+	console.log('> addr msb = ' + batteryLevel + '');
+	batteryLevel = value.getUint8(7);
+	console.log('> addr lsb = ' + batteryLevel + '');
+    return value;
+
+  }
+  catch(error){
+    console.log('Argh! ' + error);
+  };
+
+}
  
- function onButtonSyncClick() {
-  log('Requesting Bluetooth Device...');
-  navigator.bluetooth.requestDevice(
-    {filters: [{services: ['battery_service']}]})
-  .then(device => {
-    log('Connecting to GATT Server...');
-    return device.gatt.connect();
-  })
-  .then(server => {
-    log('Getting Battery Service...');
-    return server.getPrimaryService('battery_service');
-  })
-  .then(service => {
-    log('Getting Battery Level Characteristic...');
-    return service.getCharacteristic('battery_level');
-  })
-  .then(characteristic => {
-    log('Reading Battery Level...');
+ async function writevalueToService(server, cmd, val)
+ {
+  try {
+	var t = await server;	
+	characteristic = t.getCharacteristic('battery_level');
 	let value = new Uint32Array(2);
-	value[0] = SYNC_CMD;
-    value[1] = 1;
+	value[0] = cmd;
+	value[1] = val;
+	t = await characteristic;
+	t.writeValue(value);
+	}catch(error) {
+		console.log('Argh! ' + error);
+    }
+ }
+ 
+async function onButtonSendResetAdress() {
+  console.log('Requesting Bluetooth service...');
+  
+  var service = null;
+  var characteristic = null;
+  if (bluetoothDevice_slave_GATT_server != null)
+  {
+      console.log("start sending master address");
+	  try {
+      t = await bluetoothDevice_slave_GATT_server;
+	  service = t.getPrimaryService('battery_service');
+	  await writevalueToService(service, ADR_RST_CMD, 1);  
+      
+	  }catch(error){
+	    console.log('Argh! ' + error);
+	  }
+   }
+  
+  }
+ 
+ async function onButtonSendMasterAdress() {
+  console.log('Requesting Bluetooth service...');
+  
+  var service = null;
+  var characteristic = null;
+  
+  if (bluetoothDevice_slave_GATT_server != null)
+  {
+      console.log("start sending master address");
+	  try {
+      t = await bluetoothDevice_slave_GATT_server;
+	  service = t.getPrimaryService('battery_service');
+	  if (masterAddress[0] != 0)
+	  {
+		var sendv = masterAddress[0] + 	 (masterAddress[1]*0x100) +  (masterAddress[2]*0x10000) + (masterAddress[3]*0x1000000)
+		await writevalueToService(service, ADR_LSB_CMD, sendv); 
+	
+	  }
+      
+	  }catch(error){
+	    console.log('Argh! ' + error);
+	  }
+   }
+ 
+ }
+ async function onButtonSyncClick() {
+  console.log('Requesting Bluetooth service...');
+  
+  var service = null;
+  var characteristic = null;
+  
+  if (bluetoothDevice_slave_GATT_server != null)
+  {
+      console.log("start slave sync");
+	  try {
+      t = await bluetoothDevice_slave_GATT_server;
+	  service = t.getPrimaryService('battery_service');
+	  await writevalueToService(service, SYNC_CMD, 1);          // make sure this is right after the LSB CMD because of await or it will send 2 cmd at once
+
+      
+	  }catch(error){
+	    console.log('Argh! ' + error);
+	  }
+	  if (bluetoothDevice_master_GATT_server != null)
+	  {  
+		console.log("start master sync");
+		try {
+			t = await bluetoothDevice_master_GATT_server;
+			service = t.getPrimaryService('battery_service');
+			await writevalueToService(service, SYNC_CMD, 1);  
+		}catch(error)
+		{
+			console.log('Argh! ' + error);
+		}
+	  }
+	  else
+      {
+        alert("Master is not connected !"); 
+      }
+	 
+  }
+  else
+  {
+     alert("Slave is not connected !"); 
+  }
+  
+  
+  
+ 
+  
+}
+ 
+function disconnect(bluetoothDevice) 
+{
+  if (!bluetoothDevice) {
+    return;
+  }
+  console.log('Disconnecting from Bluetooth Device...');
+  if (bluetoothDevice.gatt.connected) {
+    bluetoothDevice.gatt.disconnect();
+  } else {
+    console.log('> Bluetooth Device is already disconnected');
+  }
+  if (bluetoothDevice == bluetoothDevice_master)
+	bluetoothDevice_master_GATT_server = null;
+  else
+    bluetoothDevice_slave_GATT_server = null;
+  
+  bluetoothDevice = null;
+}
+
+async function connect(bluetoothDevice, serviceID, characteristicID, handleChanged, notify){
+  return await exponentialBackoff(6 /* max retries */, 4 /* seconds delay */,
+    async function toTry() {
+      time('Connecting to Bluetooth Device... ');
+      return await bluetoothDevice.gatt.connect();
+    },
+    async function success(result) {
+      console.log('> Bluetooth Device connected. getting services.');
+      console.log(result);
+	  
+	  try {
+		service = null;
+		characteristic = null;
+		service = await result.getPrimaryService('heart_rate'); // result is the server
+		characteristic = await service.getCharacteristic('heart_rate_measurement');
+		if (notify)
+			await characteristic.startNotifications();
+		characteristic.addEventListener('characteristicvaluechanged',
+                                  handleChanged);
+		var status = await readvalueFromService(result);
+		
+	    console.log('> Bluetooth  services successfull.');
+    //    console.console.log(result);
+	    
+		if (bluetoothDevice == bluetoothDevice_slave)
+		{
+		    bluetoothDevice_slave_GATT_server = result
+			let el = document.getElementById('ConnectButton_slave');
+			el.firstChild.data = "Connected_slave";
+			if (status.getUint8(1) & 0x1)
+			{
+			    // slave is in sync
+				let el = document.getElementById('sync_sensor');
+				el.firstChild.data = "Sensors in Sync";
+				inSync = true;
+			}
+			else
+			{
+			    // slave is not sync
+				let el = document.getElementById('sync_sensor');
+				el.firstChild.data = "Sync Sensors";
+				inSync = false;
+			}
 			
-    return characteristic.writeValue(value);
-  })
-  .then(value => {
-    //let batteryLevel = value.getUint8(0);
-    //log('> Battery Level is ' + batteryLevel + '%');
-  })
-  .catch(error => {
-    log('Argh! ' + error);
-  });
+		}
+		else
+		{
+		    bluetoothDevice_master_GATT_server = result;
+			var el = document.getElementById('ConnectButton_master');
+			el.firstChild.data = "Connected_master";
+			if (status.getUint8(2) != 0) // 0 is not a valid adress byte
+			{
+				masterAddress[0] = status.getUint8(2);
+				masterAddress[1] = status.getUint8(3);
+				masterAddress[2] = status.getUint8(4);
+				masterAddress[3] = status.getUint8(5);
+				masterAddress[4] = status.getUint8(6);
+				masterAddress[5] = status.getUint8(7);
+				console.log('masteraddr 0 = ' + masterAddress[0]);
+			}
+			else
+			{
+			   console.log("not a valid address");
+			}   
+			
+		}
+		
+	  }catch(error) {
+		console.log('Argh! ' + error);
+		if (bluetoothDevice == bluetoothDevice_slave)
+		{
+			await disconnect(bluetoothDevice_slave); // disconnect completely
+		}
+		else
+		{
+		   await disconnect(bluetoothDevice_master);
+		}
+	  }
+	  
+	  
+    },
+    function fail() {
+      time('Failed to reconnect.');
+    });
 }
- 
-function onButtonClick_slave() {
-  log('Requesting Bluetooth Device...');
-  navigator.bluetooth.requestDevice(
-    {filters: [{services: ['heart_rate']}]})
-  .then(device => {
-    log('Connecting to GATT Server...');
-	bluetoothDevice = device;
-    bluetoothDevice.addEventListener('gattserverdisconnected', onDisconnected_slave);
-    return device.gatt.connect();
-	
-  })
-  .then(server => {
-    log('Getting  Service...');
-    return server.getPrimaryService('heart_rate');
-  })
-  .then(service => {
-    log('Getting Characteristic...');
-    return service.getCharacteristic('heart_rate_measurement');
-  })
-  .then(characteristic => characteristic.startNotifications())
-  .then(characteristic => {
-    log('Reading ...');
-	characteristic.addEventListener('characteristicvaluechanged',
-                                  handleSlaveChanged);
-    //document.getElementById('ConnectButton').textContent == "Connected"
-	var el = document.getElementById('ConnectButton_slave');
-    el.firstChild.data = "Connected_slave";
-  })
- // .then(value => {
- //   let batteryLevel = value.getUint8(0);
-//	let txt = bin2String(value)
-//	log ('oke: ' + txt + ' end ')
-//    log('> value is ' + value + '%');
-//  })
-  .catch(error => {
-    log('Argh! ' + error);
-  });
+
+async function onButtonClick_slave() {
+  console.log('Requesting Bluetooth Device...');
+  
+  await disconnect(bluetoothDevice_slave);
+  bluetoothDevice_slave = null; // global
+  bluetoothDevice_slave_GATT_server = null;
+  try {
+     bluetoothDevice_slave = await navigator.bluetooth.requestDevice({filters: [{services: ['heart_rate','battery_service']}],
+															optionalServices: ['battery_service','heart_rate'] });
+  
+  
+ //   bluetoothDevice_slave = await navigator.bluetooth.requestDevice({filters: [{services: ['heart_rate','battery_service']}]});
+    bluetoothDevice_slave.addEventListener('gattserverdisconnected', onDisconnected_slave);
+	connect(bluetoothDevice_slave, null, null, handleSlaveChanged, true);
+  } catch(error) {
+    console.log('Argh! ' + error);
+  }
+
 }
-function onDisconnected_slave(event) {
+async function onDisconnected_slave(event) {
   // Object event.target is Bluetooth Device getting disconnected.
-  log('> Bluetooth Device slave disconnected');
+  console.log('> Bluetooth Device slave disconnected');
   var el = document.getElementById('ConnectButton_slave');
-   el.firstChild.data = "Connect_slave";
+  el.firstChild.data = "Connect_slave";
+  bluetoothDevice_slave_GATT_server = connect(bluetoothDevice_slave, null, null, handleSlaveChanged, true);
 }
  
- function onButtonClick_master() {
-  log('Requesting Bluetooth Device...');
-  navigator.bluetooth.requestDevice(
-    {filters: [{services: ['heart_rate']}]})
-  .then(device => {
-    log('Connecting to GATT Server...');
-	bluetoothDevice = device;
-    bluetoothDevice.addEventListener('gattserverdisconnected', onDisconnected_master);
-    return device.gatt.connect();
-	
-  })
-  .then(server => {
-    log('Getting  Service...');
-    return server.getPrimaryService('heart_rate');
-  })
-  .then(service => {
-    log('Getting Characteristic...');
-    return service.getCharacteristic('heart_rate_measurement');
-  })
-  .then(characteristic => characteristic.startNotifications())
-  .then(characteristic => {
-    log('Reading ...');
-	characteristic.addEventListener('characteristicvaluechanged',
-                                  handleBatteryLevelChanged);
-    //document.getElementById('ConnectButton').textContent == "Connected"
-	var el = document.getElementById('ConnectButton_master');
-    el.firstChild.data = "Connected_master";
-  })
- // .then(value => {
- //   let batteryLevel = value.getUint8(0);
-//	let txt = bin2String(value)
-//	log ('oke: ' + txt + ' end ')
-//    log('> value is ' + value + '%');
-//  })
-  .catch(error => {
-    log('Argh! ' + error);
-  });
+async function onButtonClick_master() {
+  console.log('Requesting Bluetooth Device...');
+  await disconnect(bluetoothDevice_master);
+  bluetoothDevice_master = null; // global
+  bluetoothDevice_master_GATT_server = null;
+  try {
+    bluetoothDevice_master = await navigator.bluetooth.requestDevice({filters: [{services: ['heart_rate','battery_service']}],
+															optionalServices: ['battery_service','heart_rate'] });
+    bluetoothDevice_master.addEventListener('gattserverdisconnected', onDisconnected_master);
+	connect(bluetoothDevice_master, null, null, handleMasterChanged, true);
+  } catch(error) {
+    console.log('Argh! ' + error);
+  }
+ 
 }
 function onDisconnected_master(event) {
   // Object event.target is Bluetooth Device getting disconnected.
-  log('> Bluetooth Device master disconnected');
+  console.log('> Bluetooth Device master disconnected');
   var el = document.getElementById('ConnectButton_master');
    el.firstChild.data = "Connect_master";
+   bluetoothDevice_master_GATT_server = connect(bluetoothDevice_master, null, null, handleMasterChanged, true);
 }
 function displayData()
 {
@@ -415,64 +594,18 @@ function parseBLEvalues(value, results)
 {
     let nr_of_blks = 0;
 	 let retval = false;
-	 if (value.byteLength == 8) // buffer header has 20 bytes (at the moment)
+	 if (value.byteLength == 8) // buffer header has 8 bytes (at the moment)
 	 {
 		index = 0;
-	//	results.remainingSamplesAtTimer = value.getUint16(index, true);
-	//	index += 2;
-		
-	//    results.blockCntAtTimer = value.getUint8(index);
-	//	index++;
-        
-	//	results.timerAtRemainingSamples = value.getUint32(index, /*littleEndian=*/true);
-	//    index += 4;
-		
-	//	results.blockCntAtThreshold = value.getUint8(index);
-	//	index++;
-		
-    //    results.sampleOffsetInBlockAtThreshold = value.getUint8(index);	
-    //   index++;		
-		
-	//	results.timerValueAtStart =  results.timerAtRemainingSamples - (((SPI_NR_OF_BUFS * ELEMENTS_IN_FIFO) + results.remainingSamplesAtTimer) * TIMER_TICKS_PER_SAMPLE);
 		
 		results.maxPitchVal = value.getUint32(index, /*littleEndian=*/true);  //value.getUint64(index, /*littleEndian=*/true);
 		index += 4;
 		results.maxPitchVal = (results.maxPitchVal/ RAWVALUES_PER_DEGREE);
 		
-	//    results.blockCntAtMaxPitch =  value.getUint8(index);
-	//	index++;
-		
-	//    results.sampleOffsetInBlockAtMaxPitch = value.getUint8(index);
-	//	index++;
-		
 		results.timerAtMaxPitchCnt = value.getUint32(index, /*littleEndian=*/true);
 		index += 4;
 		
 		var correction_for_remainging_samples = 0;
-		
-	//	if (results.blockCntAtMaxPitch > results.blockCntAtTimer)
-	//	{
-	//	   nr_of_blks = results.blockCntAtMaxPitch - results.blockCntAtTimer;
-	//	}
-	//	else
-	//	{
-	//	   nr_of_blks = SPI_NR_OF_BUFS -  results.blockCntAtTimer + results.blockCntAtMaxPitch;
-	//	   correction_for_remainging_samples = results.remainingSamplesAtTimer;
-	//	}
-	//	results.timerValueAtMaxPitch =  results.timerValueAtStart + (((ELEMENTS_IN_FIFO * nr_of_blks) + results.sampleOffsetInBlockAtMaxPitch + correction_for_remainging_samples) * TIMER_TICKS_PER_SAMPLE);
-		
-	//	var correction_for_remainging_samples = 0;
-		
-	//	if (results.blockCntAtThreshold > results.blockCntAtTimer)
-	//	{
-	//	   nr_of_blks = results.blockCntAtThreshold - results.blockCntAtTimer;
-	//	}
-	//	else
-	//	{
-	//	   nr_of_blks = SPI_NR_OF_BUFS -  results.blockCntAtTimer + results.blockCntAtThreshold;
-	//	   correction_for_remainging_samples = results.remainingSamplesAtTimer;
-	//	}
-	//	results.timerValueAtThreshold =  results.timerValueAtStart + (((ELEMENTS_IN_FIFO * nr_of_blks) + results.sampleOffsetInBlockAtThreshold + correction_for_remainging_samples) * TIMER_TICKS_PER_SAMPLE);
 		retval = true;
 	  }
 	  return retval;
@@ -485,32 +618,50 @@ function handleSlaveChanged(event) {
 	
 	 if (parseBLEvalues(value, sensorValSlave) == true)
 	 {
-	
-	//	document.getElementById("TimerValueAtStart_slave").innerHTML = (sensorValSlave.timerValueAtStart/(32.768)).toFixed(0); // in mS
-	//	document.getElementById("TimerAtStop_slave").innerHTML = (sensorValSlave.timerAtRemainingSamples/(32.768)).toFixed(0);
-	//	document.getElementById("timerValueAtMaxPitch_slave").innerHTML = (sensorValSlave.timerValueAtMaxPitch/(32.768)).toFixed(0); // in mS
 		document.getElementById("MaxPitch_slave").innerHTML = (sensorValSlave.maxPitchVal).toFixed(0); // in mS
-	//	document.getElementById("timerValueAtThreshold_slave").innerHTML = (sensorValSlave.timerValueAtThreshold/32.768).toFixed(0);
 	 }
 	
 }
-function handleBatteryLevelChanged(event) {
+function handleMasterChanged(event) {
   var value = event.target.value;
   
   
    value = value.buffer ? value : new DataView(value);
    if (parseBLEvalues(value, sensorValMaster))
    {
-		
-	//	document.getElementById("TimerValueAtStart_master").innerHTML = (sensorValMaster.timerValueAtStart/(32.768)).toFixed(0); // in mS
-	//	document.getElementById("TimerAtStop_master").innerHTML = (sensorValMaster.timerAtRemainingSamples/(32.768)).toFixed(0);
-	//	document.getElementById("timerValueAtMaxPitch_master").innerHTML = (sensorValMaster.timerValueAtMaxPitch/(32.768)).toFixed(0); // in mS
-	//	document.getElementById("timerValueAtMaxPitch_masterCnt").innerHTML = (sensorValMaster.timerAtMaxPitchCnt/(32.768)).toFixed(0); 
 		document.getElementById("MaxPitch_master").innerHTML = (sensorValMaster.maxPitchVal).toFixed(0); // in mS
-	//	document.getElementById("timerValueAtThreshold_master").innerHTML = (sensorValMaster.timerValueAtThreshold/32.768).toFixed(0);
    }
    
 }
+
+
+/* Utils */
+
+// This function keeps calling "toTry" until promise resolves or has
+// retried "max" number of times. First retry has a delay of "delay" seconds.
+// "success" is called upon success.
+async function exponentialBackoff(max, delay, toTry, success, fail) {
+  try {
+    const result = await toTry();
+    success(result);
+	return result;
+  } catch(error) {
+    if (max === 0) {
+      return fail();
+    }
+    time('Retrying in ' + delay + 's... (' + max + ' tries left)');
+    setTimeout(function() {
+      exponentialBackoff(--max, delay * 2, toTry, success, fail);
+    }, delay * 1000);
+  }
+  
+}
+
+function time(text) {
+  console.log('[' + new Date().toJSON().substr(11, 8) + '] ' + text);
+}
+
+
 </script>
 
 <script>
