@@ -8,27 +8,27 @@
 	
  <title>Web Bluetooth / Battery Level Sample</title>
  
- <button class="button" id="ConnectButton_master">Connect master</button>
- <button class="button" onClick = "onButtonClick_slave()" id = "ConnectButton_slave">Connect slave</button>
- <!-- <font color="grey"><p style="font-family:arial;font-color:blue;" font color="red">time at start Master is (mS):  <span id="TimerValueAtStart_master"></span><p> 
-  <p style="font-family:arial;">timer at stop Master is (mS): <span id="TimerAtStop_master"></span><p>
-  <p style="font-family:arial;">time at maxPitch Master is (mS):  <span id="timerValueAtMaxPitch_master"></span><p>
-  <p style="font-family:arial;">time at maxPitch Master Cnt is (mS):  <span id="timerValueAtMaxPitch_masterCnt"></span><p>
-  <p style="font-family:arial;">time at threshold Master is (mS):  <span id="timerValueAtThreshold_master"></span><p>
-  <p style="font-family:arial;">time at start Slave is (mS):  <span id="TimerValueAtStart_slave"></span><p>
-  <p style="font-family:arial;">timer at stop Slave is (mS): <span id="TimerAtStop_slave"></span><p>
-  <p style="font-family:arial;">time at maxPitch Slave is (mS):  <span id="timerValueAtMaxPitch_slave"></span><p>
-  <p style="font-family:arial;">time at threshold Slave is (mS):  <span id="timerValueAtThreshold_slave"></span><p> -->
-  <font color="black"><p style="font-family:arial;">max pitch slave: <span id="MaxPitch_slave"></span><p>
-  <p style="font-family:arial;">max pitch master: <span id="MaxPitch_master"></span><p>
-  <p style="font-family:arial;">timediff master/slave (ms) : <span id="timediff"></span><p>
+ <button class="button" id="ConnectButton_back">Connect back</button>
+ <button class="button" onClick = "onButtonClick_front()" id = "ConnectButton_front">Connect front</button>
+ <!-- <font color="grey"><p style="font-family:arial;font-color:blue;" font color="red">time at start back is (mS):  <span id="TimerValueAtStart_back"></span><p> 
+  <p style="font-family:arial;">timer at stop back is (mS): <span id="TimerAtStop_back"></span><p>
+  <p style="font-family:arial;">time at maxPitch back is (mS):  <span id="timerValueAtMaxPitch_back"></span><p>
+  <p style="font-family:arial;">time at maxPitch back Cnt is (mS):  <span id="timerValueAtMaxPitch_backCnt"></span><p>
+  <p style="font-family:arial;">time at threshold back is (mS):  <span id="timerValueAtThreshold_back"></span><p>
+  <p style="font-family:arial;">time at start front is (mS):  <span id="TimerValueAtStart_front"></span><p>
+  <p style="font-family:arial;">timer at stop front is (mS): <span id="TimerAtStop_front"></span><p>
+  <p style="font-family:arial;">time at maxPitch front is (mS):  <span id="timerValueAtMaxPitch_front"></span><p>
+  <p style="font-family:arial;">time at threshold front is (mS):  <span id="timerValueAtThreshold_front"></span><p> -->
+  <font color="black"><p style="font-family:arial;">max pitch front: <span id="MaxPitch_front"></span><p>
+  <p style="font-family:arial;">max pitch back: <span id="MaxPitch_back"></span><p>
+  <p style="font-family:arial;">timediff back/front (ms) : <span id="timediff"></span><p>
   <button class="button" onClick = "onButtonSetThresholdClick()">Set threshold</button>
   <label  style="font-family:arial;" for="threshold">Threshold : </label><input id="threshold" type="number" value="100"/>  
   <br> <br>
   <button class="button" onClick = "onButtonDFUClick()">Go to FW update</button>
   <button class="button" onClick = "onButtonCsvClick()">Download Csv file</button>
   <button class="button" onClick = "onButtonSyncClick()" id = "sync_sensor">Sync Sensor</button>	
-  <button class="button" onClick = "onButtonSendMasterAdress()" id = "send_address">Send Address</button>
+  <button class="button" onClick = "onButtonSendbackAdress()" id = "send_address">Send Address</button>
   <button class="button" onClick = "onButtonSendResetAdress()" id = "reset_address">Reset Address</button>
   
 
@@ -51,18 +51,18 @@
 	 var ADR_LSB_CMD   = 0xC;
 	 var ADR_MSB_CMD   = 0xB;
 	 var ADR_RST_CMD   = 0xA;
-	 var MASTER_CMD    = 0x9;
+	 var back_CMD    = 0x9;
      var datapointx = 1;
 	 var datapointy = 2;
 	 var datapointz = 3;
 	 
-	 var bluetoothDevice_slave = null;
-	 var bluetoothDevice_slave_GATT_server = null;
-	 var bluetoothDevice_master = null;
-	 var bluetoothDevice_master_GATT_server = null;
+	 var bluetoothDevice_front = null;
+	 var bluetoothDevice_front_GATT_server = null;
+	 var bluetoothDevice_back = null;
+	 var bluetoothDevice_back_GATT_server = null;
 	 var inSync = false;
-	 var masterAddress = new Uint8Array(6);
-	 masterAddress[0] = 0; // make invalid
+	 var backAddress = new Uint8Array(6);
+	 backAddress[0] = 0; // make invalid
 	 
      class SensorValues {
         constructor()
@@ -81,12 +81,12 @@
 		}
      }
 	 
-	 var sensorValMaster = new SensorValues();
-	 var sensorValSlave = new SensorValues();
+	 var sensorValback = new SensorValues();
+	 var sensorValfront = new SensorValues();
 	 
 	 
-	 var bufCnt_master = 0;
-	 var sampleInBufCnt_master = 0;
+	 var bufCnt_back = 0;
+	 var sampleInBufCnt_back = 0;
 	 
 	 var buf = new Array();
 	 
@@ -106,16 +106,16 @@
 	 var csvData = new Array();
 	 var csvCnt  = 0;
 	 
-	 function addCsvElement(sensorValMaster, sensorValSlave, diff)
+	 function addCsvElement(sensorValback, sensorValfront, diff)
 	 {
 	    var changed = false;
 	    if (csvCnt > 0)
 	  	{
  	  
 		   // check if values are changed
-		   if (csvData[csvCnt-1][0] != sensorValMaster.maxPitchVal)
+		   if (csvData[csvCnt-1][0] != sensorValback.maxPitchVal)
 		     changed = true;
-		   if (csvData[csvCnt-1][1] != sensorValSlave.maxPitchVal)
+		   if (csvData[csvCnt-1][1] != sensorValfront.maxPitchVal)
 		     changed = true;
 		}
 		else
@@ -128,8 +128,8 @@
 		   csvData[csvCnt] = new Array();
 		   for(elements = 0; elements < 3; elements++)
 		   {
-		      csvData[csvCnt][0] = sensorValMaster.maxPitchVal;
-		      csvData[csvCnt][1] = sensorValSlave.maxPitchVal;
+		      csvData[csvCnt][0] = sensorValback.maxPitchVal;
+		      csvData[csvCnt][1] = sensorValfront.maxPitchVal;
 		      csvData[csvCnt][2] = diff;
 		   }
 		   csvCnt = csvCnt + 1;
@@ -173,9 +173,9 @@
 	<script>
 	
 	setInterval(function(){ 
-	                        diff = ((sensorValSlave.timerAtMaxPitchCnt - sensorValMaster.timerAtMaxPitchCnt)/(32.768)).toFixed(0);
+	                        diff = ((sensorValfront.timerAtMaxPitchCnt - sensorValback.timerAtMaxPitchCnt)/(32.768)).toFixed(0);
 							document.getElementById("timediff").innerHTML = diff;
-                            addCsvElement(sensorValMaster, sensorValSlave, diff);	}, 2000);
+                            addCsvElement(sensorValback, sensorValfront, diff);	}, 2000);
 	</script>
 	
  <script>
@@ -318,11 +318,11 @@ async function onButtonSendResetAdress() {
   
   var service = null;
   var characteristic = null;
-  if (bluetoothDevice_slave_GATT_server != null)
+  if (bluetoothDevice_front_GATT_server != null)
   {
-      console.log("start sending master address");
+      console.log("start sending back address");
 	  try {
-      t = await bluetoothDevice_slave_GATT_server;
+      t = await bluetoothDevice_front_GATT_server;
 	  service = t.getPrimaryService('battery_service');
 	  await writevalueToService(service, ADR_RST_CMD, 1);  
       
@@ -333,21 +333,21 @@ async function onButtonSendResetAdress() {
   
   }
  
- async function onButtonSendMasterAdress() {
+ async function onButtonSendbackAdress() {
   console.log('Requesting Bluetooth service...');
   
   var service = null;
   var characteristic = null;
   
-  if (bluetoothDevice_slave_GATT_server != null)
+  if (bluetoothDevice_front_GATT_server != null)
   {
-      console.log("start sending master address");
+      console.log("start sending back address");
 	  try {
-      t = await bluetoothDevice_slave_GATT_server;
+      t = await bluetoothDevice_front_GATT_server;
 	  service = t.getPrimaryService('battery_service');
-	  if (masterAddress[0] != 0)
+	  if (backAddress[0] != 0)
 	  {
-		var sendv = masterAddress[0] + 	 (masterAddress[1]*0x100) +  (masterAddress[2]*0x10000) + (masterAddress[3]*0x1000000)
+		var sendv = backAddress[0] + 	 (backAddress[1]*0x100) +  (backAddress[2]*0x10000) + (backAddress[3]*0x1000000)
 		await writevalueToService(service, ADR_LSB_CMD, sendv); 
 	
 	  }
@@ -364,11 +364,11 @@ async function onButtonSendResetAdress() {
   var service = null;
   var characteristic = null;
   
-  if (bluetoothDevice_slave_GATT_server != null)
+  if (bluetoothDevice_front_GATT_server != null)
   {
-      console.log("start slave sync");
+      console.log("start front sync");
 	  try {
-      t = await bluetoothDevice_slave_GATT_server;
+      t = await bluetoothDevice_front_GATT_server;
 	  service = t.getPrimaryService('battery_service');
 	  await writevalueToService(service, SYNC_CMD, 1);          // make sure this is right after the LSB CMD because of await or it will send 2 cmd at once
 
@@ -376,11 +376,11 @@ async function onButtonSendResetAdress() {
 	  }catch(error){
 	    console.log('Argh! ' + error);
 	  }
-	  if (bluetoothDevice_master_GATT_server != null)
+	  if (bluetoothDevice_back_GATT_server != null)
 	  {  
-		console.log("start master sync");
+		console.log("start back sync");
 		try {
-			t = await bluetoothDevice_master_GATT_server;
+			t = await bluetoothDevice_back_GATT_server;
 			service = t.getPrimaryService('battery_service');
 			await writevalueToService(service, SYNC_CMD, 1);  
 		}catch(error)
@@ -390,13 +390,13 @@ async function onButtonSendResetAdress() {
 	  }
 	  else
       {
-        alert("Master is not connected !"); 
+        alert("back is not connected !"); 
       }
 	 
   }
   else
   {
-     alert("Slave is not connected !"); 
+     alert("front is not connected !"); 
   }
   
   
@@ -416,10 +416,10 @@ function disconnect(bluetoothDevice)
   } else {
     console.log('> Bluetooth Device is already disconnected');
   }
-  if (bluetoothDevice == bluetoothDevice_master)
-	bluetoothDevice_master_GATT_server = null;
+  if (bluetoothDevice == bluetoothDevice_back)
+	bluetoothDevice_back_GATT_server = null;
   else
-    bluetoothDevice_slave_GATT_server = null;
+    bluetoothDevice_front_GATT_server = null;
   
   bluetoothDevice = null;
 }
@@ -448,21 +448,21 @@ async function connect(bluetoothDevice, serviceID, characteristicID, handleChang
 	    console.log('> Bluetooth  services successfull.');
     //    console.console.log(result);
 	    
-		if (bluetoothDevice == bluetoothDevice_slave)
+		if (bluetoothDevice == bluetoothDevice_front)
 		{
-		    bluetoothDevice_slave_GATT_server = result
-			let el = document.getElementById('ConnectButton_slave');
-			el.firstChild.data = "Connected_slave";
+		    bluetoothDevice_front_GATT_server = result
+			let el = document.getElementById('ConnectButton_front');
+			el.firstChild.data = "Connected_front";
 			if (status.getUint8(1) & 0x1)
 			{
-			    // slave is in sync
+			    // front is in sync
 				let el = document.getElementById('sync_sensor');
 				el.firstChild.data = "Sensors in Sync";
 				inSync = true;
 			}
 			else
 			{
-			    // slave is not sync
+			    // front is not sync
 				let el = document.getElementById('sync_sensor');
 				el.firstChild.data = "Sync Sensors";
 				inSync = false;
@@ -471,18 +471,18 @@ async function connect(bluetoothDevice, serviceID, characteristicID, handleChang
 		}
 		else
 		{
-		    bluetoothDevice_master_GATT_server = result;
-			var el = document.getElementById('ConnectButton_master');
-			el.firstChild.data = "Connected_master";
+		    bluetoothDevice_back_GATT_server = result;
+			var el = document.getElementById('ConnectButton_back');
+			el.firstChild.data = "Connected_back";
 			if (status.getUint8(2) != 0) // 0 is not a valid adress byte
 			{
-				masterAddress[0] = status.getUint8(2);
-				masterAddress[1] = status.getUint8(3);
-				masterAddress[2] = status.getUint8(4);
-				masterAddress[3] = status.getUint8(5);
-				masterAddress[4] = status.getUint8(6);
-				masterAddress[5] = status.getUint8(7);
-				console.log('masteraddr 0 = ' + masterAddress[0]);
+				backAddress[0] = status.getUint8(2);
+				backAddress[1] = status.getUint8(3);
+				backAddress[2] = status.getUint8(4);
+				backAddress[3] = status.getUint8(5);
+				backAddress[4] = status.getUint8(6);
+				backAddress[5] = status.getUint8(7);
+				console.log('backaddr 0 = ' + backAddress[0]);
 			}
 			else
 			{
@@ -493,71 +493,83 @@ async function connect(bluetoothDevice, serviceID, characteristicID, handleChang
 		
 	  }catch(error) {
 		console.log('Argh! ' + error);
-		if (bluetoothDevice == bluetoothDevice_slave)
+		if (bluetoothDevice == bluetoothDevice_front)
 		{
-			await disconnect(bluetoothDevice_slave); // disconnect completely
+			await disconnect(bluetoothDevice_front); // disconnect completely
 		}
 		else
 		{
-		   await disconnect(bluetoothDevice_master);
+		   await disconnect(bluetoothDevice_back);
 		}
 	  }
 	  
 	  
     },
     function fail() {
+	  if (bluetoothDevice == bluetoothDevice_front)
+	  {
+		    bluetoothDevice_front_GATT_server = null;
+			let el = document.getElementById('ConnectButton_front');
+			el.firstChild.data = "Connect_front";
+      }else
+	  {
+	      bluetoothDevice_back_GATT_server = null;
+		  let el = document.getElementById('ConnectButton_back');
+		  el.firstChild.data = "Connect_back";
+	  }
+	
       time('Failed to reconnect.');
     });
 }
 
-async function onButtonClick_slave() {
+async function onButtonClick_front() {
   console.log('Requesting Bluetooth Device...');
   
-  await disconnect(bluetoothDevice_slave);
-  bluetoothDevice_slave = null; // global
-  bluetoothDevice_slave_GATT_server = null;
+  await disconnect(bluetoothDevice_front);
+  bluetoothDevice_front = null; // global
+  bluetoothDevice_front_GATT_server = null;
   try {
-     bluetoothDevice_slave = await navigator.bluetooth.requestDevice({filters: [{services: ['heart_rate','battery_service']}],
+     bluetoothDevice_front = await navigator.bluetooth.requestDevice({filters: [{services: ['heart_rate','battery_service']}],
 															optionalServices: ['battery_service','heart_rate'] });
   
   
- //   bluetoothDevice_slave = await navigator.bluetooth.requestDevice({filters: [{services: ['heart_rate','battery_service']}]});
-    bluetoothDevice_slave.addEventListener('gattserverdisconnected', onDisconnected_slave);
-	connect(bluetoothDevice_slave, null, null, handleSlaveChanged, true);
+ //   bluetoothDevice_front = await navigator.bluetooth.requestDevice({filters: [{services: ['heart_rate','battery_service']}]});
+    bluetoothDevice_front.addEventListener('gattserverdisconnected', onDisconnected_front);
+	connect(bluetoothDevice_front, null, null, handlefrontChanged, true);
   } catch(error) {
     console.log('Argh! ' + error);
   }
 
 }
-async function onDisconnected_slave(event) {
+async function onDisconnected_front(event) {
   // Object event.target is Bluetooth Device getting disconnected.
-  console.log('> Bluetooth Device slave disconnected');
-  var el = document.getElementById('ConnectButton_slave');
-  el.firstChild.data = "Connect_slave";
-  bluetoothDevice_slave_GATT_server = connect(bluetoothDevice_slave, null, null, handleSlaveChanged, true);
+  console.log('> Bluetooth Device front disconnected');
+  var el = document.getElementById('ConnectButton_front');
+  el.firstChild.data = "Connect_front";
+  bluetoothDevice_front_GATT_server = connect(bluetoothDevice_front, null, null, handlefrontChanged, true);
 }
  
-async function onButtonClick_master() {
+async function onButtonClick_back() {
   console.log('Requesting Bluetooth Device...');
-  await disconnect(bluetoothDevice_master);
-  bluetoothDevice_master = null; // global
-  bluetoothDevice_master_GATT_server = null;
+  await disconnect(bluetoothDevice_back);
+  bluetoothDevice_back = null; // global
+  bluetoothDevice_back_GATT_server = null;
   try {
-    bluetoothDevice_master = await navigator.bluetooth.requestDevice({filters: [{services: ['heart_rate','battery_service']}],
+    bluetoothDevice_back = await navigator.bluetooth.requestDevice({filters: [{services: ['heart_rate','battery_service']}],
 															optionalServices: ['battery_service','heart_rate'] });
-    bluetoothDevice_master.addEventListener('gattserverdisconnected', onDisconnected_master);
-	connect(bluetoothDevice_master, null, null, handleMasterChanged, true);
+    bluetoothDevice_back.addEventListener('gattserverdisconnected', onDisconnected_back);
+	connect(bluetoothDevice_back, null, null, handlebackChanged, true);
   } catch(error) {
     console.log('Argh! ' + error);
   }
  
 }
-function onDisconnected_master(event) {
+function onDisconnected_back(event) {
   // Object event.target is Bluetooth Device getting disconnected.
-  console.log('> Bluetooth Device master disconnected');
-  var el = document.getElementById('ConnectButton_master');
-   el.firstChild.data = "Connect_master";
-   bluetoothDevice_master_GATT_server = connect(bluetoothDevice_master, null, null, handleMasterChanged, true);
+  console.log('> Bluetooth Device back disconnected');
+  var el = document.getElementById('ConnectButton_back');
+   el.firstChild.data = "Connect_back";
+   bluetoothDevice_back_GATT_server = connect(bluetoothDevice_back, null, null, handlebackChanged, true);
 }
 function displayData()
 {
@@ -610,26 +622,26 @@ function parseBLEvalues(value, results)
 	  }
 	  return retval;
 }
-function handleSlaveChanged(event) {
+function handlefrontChanged(event) {
 	var value = event.target.value;
   
 	value = value.buffer ? value : new DataView(value);
       
 	
-	 if (parseBLEvalues(value, sensorValSlave) == true)
+	 if (parseBLEvalues(value, sensorValfront) == true)
 	 {
-		document.getElementById("MaxPitch_slave").innerHTML = (sensorValSlave.maxPitchVal).toFixed(0); // in mS
+		document.getElementById("MaxPitch_front").innerHTML = (sensorValfront.maxPitchVal).toFixed(0); // in mS
 	 }
 	
 }
-function handleMasterChanged(event) {
+function handlebackChanged(event) {
   var value = event.target.value;
   
   
    value = value.buffer ? value : new DataView(value);
-   if (parseBLEvalues(value, sensorValMaster))
+   if (parseBLEvalues(value, sensorValback))
    {
-		document.getElementById("MaxPitch_master").innerHTML = (sensorValMaster.maxPitchVal).toFixed(0); // in mS
+		document.getElementById("MaxPitch_back").innerHTML = (sensorValback.maxPitchVal).toFixed(0); // in mS
    }
    
 }
@@ -666,7 +678,7 @@ function time(text) {
 
 <script>
   document.querySelector('button').addEventListener('click', function() {
-      onButtonClick_master();
+      onButtonClick_back();
   });
 
   
