@@ -347,7 +347,7 @@ async function onButtonSendResetAdress() {
 	  service = t.getPrimaryService('battery_service');
 	  if (backAddress[0] != 0)
 	  {
-		var sendv = backAddress[0] + 	 (backAddress[1]*0x100) +  (backAddress[2]*0x10000) + (backAddress[3]*0x1000000)
+		var sendv = backAddress[0] + (backAddress[1]*0x100) +  (backAddress[2]*0x10000) + (backAddress[3]*0x1000000)
 		await writevalueToService(service, ADR_LSB_CMD, sendv); 
 	
 	  }
@@ -370,7 +370,7 @@ async function onButtonSendResetAdress() {
 	  try {
       t = await bluetoothDevice_front_GATT_server;
 	  service = t.getPrimaryService('battery_service');
-	  await writevalueToService(service, SYNC_CMD, 1);          // make sure this is right after the LSB CMD because of await or it will send 2 cmd at once
+	  await writevalueToService(service, SYNC_CMD, 80);          // make sure this is right after the LSB CMD because of await or it will send 2 cmd at once
 
       
 	  }catch(error){
@@ -382,7 +382,7 @@ async function onButtonSendResetAdress() {
 		try {
 			t = await bluetoothDevice_back_GATT_server;
 			service = t.getPrimaryService('battery_service');
-			await writevalueToService(service, SYNC_CMD, 1);  
+			await writevalueToService(service, SYNC_CMD, 80);  
 		}catch(error)
 		{
 			console.log('Argh! ' + error);
