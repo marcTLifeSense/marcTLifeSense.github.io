@@ -1,4 +1,4 @@
- <!doctype html>
+  <!doctype html>
 <!--
 --->
 <link href="style.css" rel="stylesheet" type="text/css">
@@ -26,12 +26,14 @@
   <label  style="font-family:arial;" for="threshold">Threshold : </label><input id="threshold" type="number" value="100"/>  
   <br> <br>
   <button class="button" onClick = "onButtonDFUClick()">Go to FW update</button>
-  <button class="button" onClick = "onButtonCsvClick()">Download Csv file</button>
+  <button class="button" onClick = "onButtonCsvClick()">Download Csv file </button>
+  <button class="button" onClick = "onButtonReadCache()">ReadCache </button>
   <button class="button" onClick = "onButtonSyncClick()" id = "sync_sensor">Sync Sensor</button>	
   <button class="button" onClick = "onButtonSendbackAdress()" id = "send_address">Send Address</button>
   <button class="button" onClick = "onButtonSendResetAdress()" id = "reset_address">Reset Address</button>
-  
-
+  <button class="button" onClick = "onButtonSendResetTimings()" id = "reset_timings">Reset Timings</button>
+  <button class="button" onClick = "onButtonSendStartMeasure()" id = "start_measure">Start Measure</button>
+  <button class="button" onClick = "onButtonSendStopMeasure()" id = "stop_measure">Stop Measure</button>
 
   <img class="resize centre" src="https://media.licdn.com/dms/image/C560BAQEaiqa3qYlsPQ/company-logo_200_200/0?e=2159024400&v=beta&t=ptepbzkvRI7JMeGMFG_OGVPvc0bnl_wH3ODMADikDao" alt="LSG LOGO">
  
@@ -51,7 +53,13 @@
 	 var ADR_LSB_CMD   = 0xC;
 	 var ADR_MSB_CMD   = 0xB;
 	 var ADR_RST_CMD   = 0xA;
-	 var back_CMD    = 0x9;
+	 var back_CMD      = 0x9;
+	 var READ_TIM_CMD  = 0x8;
+     var CLEAR_TIM_CMD = 0x7;
+     var START_MEASURING_CMD = 0x6;
+     var STOP_MEASURING_CMD= 0x5;
+   
+   
      var datapointx = 1;
 	 var datapointy = 2;
 	 var datapointz = 3;
@@ -106,6 +114,7 @@
 	 var csvData = new Array();
 	 var csvCnt  = 0;
 	 
+	 
 	 function addCsvElement(sensorValback, sensorValfront, diff)
 	 {
 	    var changed = false;
@@ -134,6 +143,32 @@
 		   }
 		   csvCnt = csvCnt + 1;
 		}
+	 }
+	 
+	 function addCsvElementCache(sensorVal, sensorTiming, front)
+	 {
+	   if (front)
+	   {
+	     csvDataFromCacheF[csvCntFromCacheF] = new Array();
+	     for(elements = 0; elements < 2; elements++)
+		 {
+			csvDataFromCacheF[csvCntFromCacheF][0] = sensorVal;
+			csvDataFromCacheF[csvCntFromCacheF][1] = sensorTiming;
+		 }
+		 csvCntFromCacheF = csvCntFromCacheF + 1;
+		  
+	   }
+	   else
+	   {
+	      csvDataFromCacheB[csvCntFromCacheB] = new Array();
+	      for(elements = 0; elements < 2; elements++)
+		  {
+			csvDataFromCacheB[csvCntFromCacheB][0] = sensorVal;
+			csvDataFromCacheB[csvCntFromCacheB][1] = sensorTiming;
+		  }
+		  csvCntFromCacheB = csvCntFromCacheB + 1;
+	   
+	   }
 	 }
 
   </script>
@@ -198,6 +233,22 @@ function onButtonCsvClick() {
   var link = document.createElement("a");
   link.setAttribute("href", data);
   link.setAttribute("download", "my_data.csv");
+  document.body.appendChild(link); // Required for FF
+
+  link.click(); // This will download the data file named "my_data.csv".
+
+ // window.open();
+};
+
+function onButtonCsvCache(filename, front) {
+
+  if (front)
+    var data = downloadableCSV(csvDataFromCacheF);
+  else
+    var data = downloadableCSV(csvDataFromCacheB);
+  var link = document.createElement("a");
+  link.setAttribute("href", data);
+  link.setAttribute("download", filename);
   document.body.appendChild(link); // Required for FF
 
   link.click(); // This will download the data file named "my_data.csv".
@@ -278,6 +329,7 @@ async function readvalueFromService(server)
   
   try {
   
+  await server;
   var service = await server.getPrimaryService('battery_service');
   var characteristic = await service.getCharacteristic('battery_level');
   var value = await characteristic.readValue();
@@ -320,7 +372,7 @@ async function onButtonSendResetAdress() {
   var characteristic = null;
   if (bluetoothDevice_front_GATT_server != null)
   {
-      console.log("start sending back address");
+      console.log("start sending reset address");
 	  try {
       t = await bluetoothDevice_front_GATT_server;
 	  service = t.getPrimaryService('battery_service');
@@ -332,6 +384,147 @@ async function onButtonSendResetAdress() {
    }
   
   }
+  
+
+async function onButtonSendResetTimings() {
+  console.log('Requesting Bluetooth service...');
+  
+  var service = null;
+  var characteristic = null;
+  if (bluetoothDevice_front_GATT_server != null)
+  {
+      console.log(" reset timings front");
+	  try {
+      t = await bluetoothDevice_front_GATT_server;
+	  service = t.getPrimaryService('battery_service');
+	  await writevalueToService(service, CLEAR_TIM_CMD, 1);  
+      
+	  }catch(error){
+	    console.log('Argh! ' + error);
+	  }
+   }
+   
+  if (bluetoothDevice_back_GATT_server != null)
+  {
+      console.log(" reset timings back");
+	  try {
+      t = await bluetoothDevice_back_GATT_server;
+	  service = t.getPrimaryService('battery_service');
+	  await writevalueToService(service, CLEAR_TIM_CMD, 1);  
+      
+	  }catch(error){
+	    console.log('Argh! ' + error);
+	  }
+   }
+   
+  
+  }  
+  
+
+async function onButtonSendStartMeasure() {
+  console.log('Requesting Bluetooth service...');
+  
+  var service = null;
+  var characteristic = null;
+  if (bluetoothDevice_front_GATT_server != null)
+  {
+      console.log(" Start Measure front");
+	  try {
+      t = await bluetoothDevice_front_GATT_server;
+	  service = t.getPrimaryService('battery_service');
+	  await writevalueToService(service, START_MEASURING_CMD, 1);  
+      
+	  }catch(error){
+	    console.log('Argh! ' + error);
+	  }
+   }
+   
+  if (bluetoothDevice_back_GATT_server != null)
+  {
+      console.log(" Start Measure back");
+	  try {
+      t = await bluetoothDevice_back_GATT_server;
+	  service = t.getPrimaryService('battery_service');
+	  await writevalueToService(service, START_MEASURING_CMD, 1);  
+      
+	  }catch(error){
+	    console.log('Argh! ' + error);
+	  }
+   }
+ }  
+  
+ 
+async function onButtonSendStopMeasure() {
+  console.log('Requesting Bluetooth service...');
+  
+  var service = null;
+  var characteristic = null;
+  if (bluetoothDevice_front_GATT_server != null)
+  {
+      console.log(" Stop Measure front");
+	  try {
+      t = await bluetoothDevice_front_GATT_server;
+	  service = t.getPrimaryService('battery_service');
+	  await writevalueToService(service, STOP_MEASURING_CMD, 1);  
+      
+	  }catch(error){
+	    console.log('Argh! ' + error);
+	  }
+   }
+   
+  if (bluetoothDevice_back_GATT_server != null)
+  {
+      console.log(" Stop Measure back");
+	  try {
+      t = await bluetoothDevice_back_GATT_server;
+	  service = t.getPrimaryService('battery_service');
+	  await writevalueToService(service, STOP_MEASURING_CMD, 1);  
+      
+	  }catch(error){
+	    console.log('Argh! ' + error);
+	  }
+   }
+ }  
+ 
+  
+  async function onButtonReadCache() {
+  console.log('Requesting sensor cache...');
+  
+  var service = null;
+  var characteristic = null;
+  csvDataFromCacheF = new Array();
+  csvCntFromCacheF  = 0;
+  csvDataFromCacheB = new Array();
+  csvCntFromCacheB  = 0;
+  
+  if (bluetoothDevice_front_GATT_server != null)
+  {
+      console.log(" get data front");
+	  try {
+      t = await bluetoothDevice_front_GATT_server;
+	  service = await t.getPrimaryService('battery_service');
+	  await writevalueToService(service, READ_TIM_CMD, 1);  
+	  }catch(error){
+	    console.log('Argh! ' + error);
+	  }
+  }
+  
+  if (bluetoothDevice_back_GATT_server != null)
+  {
+      console.log(" get data back");
+	  try {
+      t = await bluetoothDevice_back_GATT_server;
+	  service = await t.getPrimaryService('battery_service');
+	  await writevalueToService(service, READ_TIM_CMD, 1);  
+      
+	  }catch(error){
+	    console.log('Argh! ' + error);
+	  }
+   }
+ }  
+ 
+ 
+
  
  async function onButtonSendbackAdress() {
   console.log('Requesting Bluetooth service...');
@@ -602,35 +795,102 @@ DataView.prototype.getUint64 = function(byteOffset, littleEndian) {
     console.warn(combined, 'exceeds MAX_SAFE_INTEGER. Precision may be lost');
   return combined;
 }
-function parseBLEvalues(value, results)
+function parseBLEvalues(value, resultsArray, stopDetected)
 {
-    let nr_of_blks = 0;
-	 let retval = false;
+	 var rettype = 'nothing';
+	 var result = new SensorValues();
 	 if (value.byteLength == 8) // buffer header has 8 bytes (at the moment)
 	 {
+	    
 		index = 0;
 		
-		results.maxPitchVal = value.getUint32(index, /*littleEndian=*/true);  //value.getUint64(index, /*littleEndian=*/true);
+		result.maxPitchVal = value.getUint32(index, /*littleEndian=*/true);  //value.getUint64(index, /*littleEndian=*/true);
 		index += 4;
-		results.maxPitchVal = (results.maxPitchVal/ RAWVALUES_PER_DEGREE);
-		
-		results.timerAtMaxPitchCnt = value.getUint32(index, /*littleEndian=*/true);
+		result.maxPitchVal = (result.maxPitchVal/ RAWVALUES_PER_DEGREE);
+		result.maxPitchVal = Math.floor(result.maxPitchVal);
+		result.timerAtMaxPitchCnt = value.getUint32(index, /*littleEndian=*/true);
 		index += 4;
 		
-		var correction_for_remainging_samples = 0;
-		retval = true;
+        resultsArray.push(result);
+		
+		rettype = 'measurement';
 	  }
-	  return retval;
+	  
+	  
+	   if (value.byteLength == 16)  {
+	   
+		
+		rettype = 'cache'
+		
+		index = 0;
+	    var pitch = value.getUint32(index, /*littleEndian=*/true);  //value.getUint64(index, /*littleEndian=*/true);
+		index += 4;
+		pitch = (pitch/ RAWVALUES_PER_DEGREE);
+		
+		var timing = value.getUint32(index, /*littleEndian=*/true);
+		index += 4;
+		
+		
+		if ((pitch != 0) && (timing !=0))
+		{
+		     result.maxPitchVal = pitch;
+			 result.maxPitchVal = Math.floor(result.maxPitchVal);
+			 result.timerAtMaxPitchCnt = timing;
+			 resultsArray.push(result);
+			 result = new SensorValues();
+		    
+			 pitch = value.getUint32(index, /*littleEndian=*/true);  //value.getUint64(index, /*littleEndian=*/true);
+			index += 4;
+			pitch = (pitch/ RAWVALUES_PER_DEGREE);
+		
+			 timing = value.getUint32(index, /*littleEndian=*/true);
+			index += 4;
+		
+			if ((pitch != 0) && (timing !=0))
+			{
+			   result.maxPitchVal = pitch;
+			   result.maxPitchVal = Math.floor(result.maxPitchVal);
+			   result.timerAtMaxPitchCnt = timing;
+			   resultsArray.push(result);
+			}
+			else 
+				rettype = 'cacheFinished'
+			
+		}
+		else
+		{
+			rettype = 'cacheFinished'
+		}
+ 	  
+      }
+	  
+	  return rettype;
 }
+
 function handlefrontChanged(event) {
 	var value = event.target.value;
   
 	value = value.buffer ? value : new DataView(value);
       
-	
-	 if (parseBLEvalues(value, sensorValfront) == true)
+	 var resultVal = [];
+	 var type = parseBLEvalues(value, resultVal);
+	 
+	 if ( type == 'measurement')
 	 {
+	    sensorValfront = resultVal[0];
 		document.getElementById("MaxPitch_front").innerHTML = (sensorValfront.maxPitchVal).toFixed(0); // in mS
+	 }
+	 if (( type == 'cache') || (type == "cacheFinished"))
+	 {
+	    for (i=0; i < resultVal.length;i++)
+        {		
+			addCsvElementCache(resultVal[i].maxPitchVal, resultVal[i].timerAtMaxPitchCnt, true);
+		}
+		if (type == "cacheFinished")
+		{
+			onButtonCsvCache("front.csv", true)
+		}
+		   
 	 }
 	
 }
@@ -639,11 +899,29 @@ function handlebackChanged(event) {
   
   
    value = value.buffer ? value : new DataView(value);
-   if (parseBLEvalues(value, sensorValback))
-   {
-		document.getElementById("MaxPitch_back").innerHTML = (sensorValback.maxPitchVal).toFixed(0); // in mS
-   }
    
+   var resultVal = [];
+	 var type = parseBLEvalues(value, resultVal);
+	 
+	 if ( type == 'measurement')
+	 {
+	    sensorValback = resultVal[0];
+		document.getElementById("MaxPitch_back").innerHTML = (sensorValback.maxPitchVal).toFixed(0); // in mS
+	 }
+	 if (( type == 'cache') || (type == "cacheFinished"))
+	 {
+	    for (i=0; i < resultVal.length;i++)
+        {		
+			addCsvElementCache(resultVal[i].maxPitchVal, resultVal[i].timerAtMaxPitchCnt, false);
+		}
+		if (type == "cacheFinished")
+		{
+			onButtonCsvCache("back.csv", false)
+		}
+		   
+	 }
+  
+
 }
 
 
